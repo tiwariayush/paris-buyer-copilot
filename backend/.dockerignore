@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+tests/
+# Skip the raw DVF gzip downloads; we only need the built duckdb file.
+data/dvf/
+*.csv.gz
+.git/
+.gitignore
+README.md
