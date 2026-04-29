@@ -1,7 +1,10 @@
+"use client";
+
 import { Card, CardLabel } from "./Card";
 import { formatEur, formatPct } from "@/lib/api";
-import type { Listing, Valuation } from "@/lib/types";
+import type { Comp, Listing, Valuation } from "@/lib/types";
 import { cn } from "@/lib/cn";
+import { EstimationReasoningModal } from "@/components/EstimationReasoningModal";
 
 const tierLabel: Record<string, string> = {
   building: "Même immeuble",
@@ -25,11 +28,13 @@ const confidenceColor: Record<string, string> = {
 export function PriceCard({
   listing,
   valuation,
+  comps,
   deltaPct,
   deltaEur,
 }: {
   listing: Listing;
   valuation: Valuation;
+  comps: Comp[];
   deltaPct?: number | null;
   deltaEur?: number | null;
 }) {
@@ -69,6 +74,14 @@ export function PriceCard({
               {valuation.price_per_m2_estimate.toLocaleString("fr-FR")} €/m² médian
             </div>
           ) : null}
+          <div className="mt-3">
+            <EstimationReasoningModal
+              listing={listing}
+              valuation={valuation}
+              comps={comps}
+              deltaPct={deltaPct}
+            />
+          </div>
         </div>
       </div>
 

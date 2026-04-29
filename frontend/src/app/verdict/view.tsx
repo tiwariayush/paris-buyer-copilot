@@ -140,6 +140,7 @@ function Results({ data }: { data: AnalyzeResponse }) {
       <PriceCard
         listing={listing}
         valuation={valuation}
+        comps={comps}
         deltaPct={delta_pct}
         deltaEur={delta_eur}
       />

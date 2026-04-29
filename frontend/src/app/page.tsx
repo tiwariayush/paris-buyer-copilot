@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ClipboardPaste } from "lucide-react";
 
 const URL_RE = /^\s*https?:\/\/[^\s]+\s*$/i;
 
@@ -37,32 +38,24 @@ export default function Home() {
 
   return (
     <main className="flex-1 flex flex-col">
-      <header className="px-6 md:px-12 py-6 border-b border-[var(--border)]">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm tracking-tight text-[var(--accent)]">
-            paris.copilot
-          </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)] font-mono">
-            DVF · DPE · BAN · IRIS
-          </span>
-        </div>
-      </header>
-
       <section className="flex-1 flex items-center justify-center px-6 md:px-12 py-16">
         <div className="w-full max-w-2xl">
-          <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent)] font-semibold mb-3">
-            Buyer copilot
-          </div>
-          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05]">
-            Combien vaut <em className="italic">vraiment</em> cette annonce&nbsp;?
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight leading-[1.1]">
+            Combien vaut{" "}
+            <span className="text-[var(--accent)] italic">vraiment</span>{" "}
+            cette annonce ?
           </h1>
           <p className="mt-4 text-base md:text-lg text-[var(--muted)] leading-relaxed">
-            Collez l&apos;URL d&apos;une annonce — ou si le portail bloque (SeLoger,
-            LeBonCoin&hellip;), <em>copiez l&apos;annonce elle-même</em>{" "}
-            (<kbd className="font-mono text-xs px-1 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)]">⌘A ⌘C</kbd>{" "}
-            sur la page) et collez tout ici.
+            Collez une URL ou le contenu d&apos;une annonce pour obtenir une estimation transparente, appuyée sur les ventes notariales réelles à Paris.
           </p>
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)]/45 px-3 py-2">
+            <ClipboardPaste className="h-4 w-4 mt-0.5 text-[var(--accent)] shrink-0" />
+            <p className="text-sm text-[var(--muted)] leading-relaxed">
+              Pour copier-coller une annonce : ouvrez la page, faites{" "}
+              <span className="font-mono text-[var(--foreground)]">Cmd+A</span>, puis{" "}
+              <span className="font-mono text-[var(--foreground)]">Cmd+C</span>, et collez ici.
+            </p>
+          </div>
 
           <form onSubmit={submit} className="mt-8 flex flex-col gap-3">
             <textarea
@@ -73,6 +66,9 @@ export default function Home() {
               className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--card)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-y font-sans"
               autoFocus
             />
+            <p className="text-xs text-[var(--muted)]">
+              Astuce : pour de meilleurs résultats, copiez la page complète de l&apos;annonce (description, prix, surface, étage, DPE).
+            </p>
             {showSourceInput ? (
               <input
                 type="url"
@@ -102,21 +98,6 @@ export default function Home() {
               <p className="text-sm text-[var(--negative)]">{error}</p>
             ) : null}
           </form>
-
-          <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <Bullet
-              title="Mêmes ventes que les notaires"
-              body="DVF — toutes les transactions notariales depuis 2014."
-            />
-            <Bullet
-              title="DPE intégré"
-              body="Classes F/G = travaux obligatoires = levier de prix réel."
-            />
-            <Bullet
-              title="Aucune commission"
-              body="Vous repartez avec une argumentation que les agents ne peuvent pas masquer."
-            />
-          </div>
         </div>
       </section>
 
@@ -125,14 +106,5 @@ export default function Home() {
         Nationale · IRIS (INSEE) · IDFM · data.education.gouv.fr.
       </footer>
     </main>
-  );
-}
-
-function Bullet({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
-      <div className="font-semibold text-sm text-[var(--foreground)]">{title}</div>
-      <div className="mt-1 text-[var(--muted)] leading-relaxed">{body}</div>
-    </div>
   );
 }
