@@ -1,0 +1,26 @@
+.DS_Store
+
+# Node / Next
+node_modules/
+.next/
+out/
+.vercel/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Local config
+.env
+.env.local
+.env.*.local
+
+# Data (large, regenerable from DVF)
+backend/data/
+backend/.duckdb-temp/
+
+# Logs
+*.log

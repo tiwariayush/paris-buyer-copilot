@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+  --background: #fafaf7;
+  --foreground: #0a0a0a;
+  --muted: #6b6b66;
+  --border: #e6e4dd;
+  --card: #ffffff;
+  --accent: #1c4eaa;
+  --accent-soft: #e3eaf6;
+  --positive: #166534;
+  --negative: #991b1b;
+  --warning: #92400e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0c0c0a;
+    --foreground: #f5f3ec;
+    --muted: #9b9b94;
+    --border: #232320;
+    --card: #161614;
+    --accent: #7aa2f7;
+    --accent-soft: #1a2237;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.font-mono { font-family: var(--font-mono), ui-monospace, monospace; }
