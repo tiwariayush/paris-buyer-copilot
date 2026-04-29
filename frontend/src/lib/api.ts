@@ -3,18 +3,22 @@ import type { AnalyzeResponse } from "./types";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
-export async function analyze(url: string): Promise<AnalyzeResponse> {
+/** URL or pasted listing content; backend auto-detects. */
+export async function analyze(
+  content: string,
+  sourceUrl?: string,
+): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ content, source_url: sourceUrl }),
     cache: "no-store",
   });
   if (!res.ok) {
     let detail = res.statusText;
     try {
-      const body = await res.json();
-      detail = body.detail ?? detail;
+      const b = await res.json();
+      detail = b.detail ?? detail;
     } catch {}
     throw new Error(detail || `Request failed (${res.status})`);
   }

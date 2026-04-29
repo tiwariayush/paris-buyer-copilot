@@ -16,25 +16,48 @@ import { Card, CardLabel, CardTitle } from "@/components/Card";
 export default function VerdictView() {
   const params = useSearchParams();
   const router = useRouter();
-  const url = params.get("url");
+  const id = params.get("id");
+  // Legacy support: ?url=... still works for direct linking.
+  const legacyUrl = params.get("url");
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!url) return;
+    let content: string | null = null;
+    let sourceUrl: string | undefined = undefined;
+    if (id) {
+      const raw = sessionStorage.getItem(`analyze:${id}`);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as { content: string; source_url?: string | null };
+          content = parsed.content;
+          sourceUrl = parsed.source_url ?? undefined;
+        } catch {
+          /* ignore */
+        }
+      }
+    } else if (legacyUrl) {
+      content = legacyUrl;
+    }
+
+    if (!content) {
+      setErr("Aucune annonce. Retournez à l'accueil et réessayez.");
+      return;
+    }
+
     setLoading(true);
     setErr(null);
-    analyze(url)
+    analyze(content, sourceUrl)
       .then(setData)
       .catch((e: Error) => setErr(e.message))
       .finally(() => setLoading(false));
-  }, [url]);
+  }, [id, legacyUrl]);
 
-  if (!url) {
+  if (!id && !legacyUrl) {
     return (
       <div className="flex-1 flex items-center justify-center text-[var(--muted)]">
-        Aucune URL.
+        Aucune annonce.
       </div>
     );
   }

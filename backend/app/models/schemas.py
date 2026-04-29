@@ -8,7 +8,13 @@ from pydantic import BaseModel, Field, HttpUrl
 
 
 class AnalyzeRequest(BaseModel):
-    url: HttpUrl
+    """Single field, two ways:
+    - URL → backend tries to fetch + parse JSON-LD
+    - Plain text/HTML (paste) → backend runs LLM extractor
+    The frontend picks based on what looks like a URL.
+    """
+    content: str = Field(..., min_length=4)
+    source_url: HttpUrl | None = None  # preserved when content is a paste
 
 
 class Listing(BaseModel):

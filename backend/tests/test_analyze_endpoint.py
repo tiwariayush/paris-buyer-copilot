@@ -76,7 +76,7 @@ def client(monkeypatch):
 def test_analyze_end_to_end(client):
     r = client.post(
         "/analyze",
-        json={"url": "https://www.bienici.com/annonce/test"},
+        json={"content": "https://www.bienici.com/annonce/test"},
     )
     assert r.status_code == 200, r.text
     body = r.json()
