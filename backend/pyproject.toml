@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+    "curl-cffi>=0.15.0",
     "duckdb>=1.5.2",
     "extruct>=0.18.0",
     "fastapi>=0.136.1",

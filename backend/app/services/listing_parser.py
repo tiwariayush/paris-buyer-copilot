@@ -49,6 +49,16 @@ def detect_portal(url: str) -> str:
 async def fetch(url: str) -> str:
     cfg = settings()
     host = urlparse(url).hostname or ""
+    log.info("listing_fetch_start host=%s url=%s", host, url[:200])
+
+    # Try curl_cffi first: impersonates Chrome's TLS fingerprint to bypass
+    # DataDome (SeLoger) and Cloudflare (PAP) anti-bot on datacenter IPs.
+    try:
+        return await _fetch_curl_cffi(url, host, cfg)
+    except Exception as exc:
+        log.info("listing_fetch_curl_cffi_failed host=%s err=%s, trying httpx", host, exc)
+
+    # Fallback to plain httpx (works for portals without anti-bot).
     async with httpx.AsyncClient(
         headers={
             "User-Agent": cfg.user_agent,
@@ -57,7 +67,6 @@ async def fetch(url: str) -> str:
         timeout=cfg.request_timeout_s,
         follow_redirects=True,
     ) as client:
-        log.info("listing_fetch_start host=%s url=%s", host, url[:200])
         resp = await client.get(url)
         if resp.status_code >= 400:
             body_preview = (resp.text or "")[:400].replace("\n", " ")
@@ -70,12 +79,51 @@ async def fetch(url: str) -> str:
             )
         resp.raise_for_status()
         log.info(
-            "listing_fetch_ok host=%s status=%s html_bytes=%s",
+            "listing_fetch_ok host=%s status=%s html_bytes=%s method=httpx",
             host,
             resp.status_code,
             len(resp.text or ""),
         )
         return resp.text
+
+
+async def _fetch_curl_cffi(url: str, host: str, cfg: Any) -> str:
+    """Fetch with curl_cffi using Chrome TLS impersonation."""
+    import asyncio
+    from curl_cffi.requests import Session
+
+    def _do_fetch() -> str:
+        with Session(impersonate="chrome") as s:
+            resp = s.get(
+                url,
+                headers={
+                    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                    "Sec-Fetch-User": "?1",
+                    "Upgrade-Insecure-Requests": "1",
+                },
+                timeout=cfg.request_timeout_s,
+                allow_redirects=True,
+            )
+            if resp.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    f"HTTP {resp.status_code}",
+                    request=None,  # type: ignore[arg-type]
+                    response=None,  # type: ignore[arg-type]
+                )
+            return resp.text
+
+    text = await asyncio.to_thread(_do_fetch)
+    log.info(
+        "listing_fetch_ok host=%s html_bytes=%s method=curl_cffi",
+        host,
+        len(text or ""),
+    )
+    return text
 
 
 def _extract_jsonld(html: str, url: str) -> list[dict[str, Any]]:
