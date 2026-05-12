@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import analyze, health
 from .config import settings
+from .logging_setup import configure_app_logging
+
+configure_app_logging()
 
 app = FastAPI(
     title="Paris Buyer Copilot",
@@ -25,6 +28,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Trace-Id"],
 )
 
 app.include_router(health.router, tags=["meta"])

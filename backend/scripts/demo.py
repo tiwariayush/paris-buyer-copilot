@@ -56,7 +56,7 @@ def main() -> int:
         url = "http://127.0.0.1:9999/listing"
         r = httpx.post(
             "http://127.0.0.1:8000/analyze",
-            json={"url": url},
+            json={"content": url},
             timeout=60.0,
         )
         print(f"HTTP {r.status_code}")

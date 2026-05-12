@@ -46,28 +46,33 @@ export default function Home() {
             cette annonce ?
           </h1>
           <p className="mt-4 text-base md:text-lg text-[var(--muted)] leading-relaxed">
-            Collez une URL ou le contenu d&apos;une annonce pour obtenir une estimation transparente, appuyée sur les ventes notariales réelles à Paris.
+            Commencez par le <strong className="font-medium text-[var(--foreground)]">lien</strong>{" "}
+            de l&apos;annonce : nous téléchargeons la page HTML côté serveur et en extrayons prix, surface et adresse
+            (données structurées ou analyse du texte de la page). Estimation transparente à partir des ventes notariales réelles à Paris.
           </p>
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)]/45 px-3 py-2">
-            <ClipboardPaste className="h-4 w-4 mt-0.5 text-[var(--accent)] shrink-0" />
-            <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Pour copier-coller une annonce : ouvrez la page, faites{" "}
-              <span className="font-mono text-[var(--foreground)]">Cmd+A</span>, puis{" "}
-              <span className="font-mono text-[var(--foreground)]">Cmd+C</span>, et collez ici.
+          <details className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+            <summary className="cursor-pointer text-sm text-[var(--muted)] list-none flex items-center gap-2 [&::-webkit-details-marker]:hidden">
+              <ClipboardPaste className="h-4 w-4 text-[var(--accent)] shrink-0" />
+              <span>Le site bloque ou la page est vide ? Utiliser le copier-coller</span>
+            </summary>
+            <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed pl-6">
+              Ouvrez l&apos;annonce dans votre navigateur, faites{" "}
+              <span className="font-mono text-[var(--foreground)]">Cmd+A</span> puis{" "}
+              <span className="font-mono text-[var(--foreground)]">Cmd+C</span>, et collez le texte à la place du lien.
             </p>
-          </div>
+          </details>
 
           <form onSubmit={submit} className="mt-8 flex flex-col gap-3">
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder={"https://www.bienici.com/annonce/...\n\n— ou —\n\n3 pièces 65m² rue de Rivoli Paris 1er, 850 000 €, 4e étage avec ascenseur, DPE D…"}
+              placeholder={"https://www.bienici.com/annonce/...\n\n— si besoin : texte collé depuis la page —\n\n3 pièces 65m² rue de Rivoli Paris 1er, 850 000 €, 4e étage avec ascenseur, DPE D…"}
               rows={isUrl ? 2 : 8}
               className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--card)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-y font-sans"
               autoFocus
             />
             <p className="text-xs text-[var(--muted)]">
-              Astuce : pour de meilleurs résultats, copiez la page complète de l&apos;annonce (description, prix, surface, étage, DPE).
+              En mode URL : privilégiez le lien direct vers l&apos;annonce. En mode texte : incluez prix, m², adresse ou code postal, étage et DPE si visibles.
             </p>
             {showSourceInput ? (
               <input

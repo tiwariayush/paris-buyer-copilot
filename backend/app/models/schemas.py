@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field, HttpUrl
 
 class AnalyzeRequest(BaseModel):
     """Single field, two ways:
-    - URL → backend tries to fetch + parse JSON-LD
-    - Plain text/HTML (paste) → backend runs LLM extractor
+    - URL → backend downloads HTML, parses JSON-LD / portal blobs, then
+      if needed runs the same HTML through the text extractor (LLM or regex).
+    - Plain text/HTML (paste) → backend runs the extractor only.
     The frontend picks based on what looks like a URL.
     """
     content: str = Field(..., min_length=4)

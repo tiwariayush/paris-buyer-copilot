@@ -13,7 +13,7 @@ OpenAPI: <http://localhost:8000/docs>
 
 ## Endpoints
 
-- `POST /analyze` — `{"url": "..."}` → full bundle (listing, comps, valuation, DPE, neighborhood, negotiation).
+- `POST /analyze` — `{"content": "<url or pasted listing text>"}` → full bundle (listing, comps, valuation, DPE, neighborhood, negotiation).
 - `GET /health` — backend status + DVF row count.
 
 ## Tests

@@ -1,9 +1,9 @@
 """LLM-powered listing extraction from any blob of text.
 
-Use case: the user pastes the visible content of a listing page that we can't
-fetch server-side (SeLoger, LeBonCoin, Bien'ici, PAP all block cloud IPs in
-2026). The pasted blob may be plain copy-paste (`Cmd+A Cmd+C`), HTML, or a
-markdown-ish dump — we let the LLM extract structured fields.
+Use case: (1) the user pastes visible listing text/HTML when portals block
+server fetch, or (2) the backend already downloaded the page HTML from a URL
+but structured SEO fields are incomplete — the same extractor runs on that
+HTML. The blob may be plain text, raw HTML, or a markdown-ish dump.
 
 We use OpenAI's structured outputs to guarantee a typed result. Falls back
 to a coarse regex-based extractor when no API key is set, so the demo

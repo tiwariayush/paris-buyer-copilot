@@ -25,6 +25,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+HTML_SHELL_NO_LD = """
+<!doctype html><html><head><title>Annonce</title></head><body>
+<p>Vente 720 000 €</p>
+<p>65 m², 3 pièces</p>
+<p>5 rue du Faubourg du Temple, 75011 Paris</p>
+<p>DPE D</p>
+</body></html>
+"""
+
+
 HTML = """
 <!doctype html><html><head>
 <script type="application/ld+json">
@@ -88,3 +98,48 @@ def test_analyze_end_to_end(client):
     assert body["negotiation"]["verdict"]
     assert len(body["negotiation"]["levers"]) >= 1
     assert body["negotiation"]["opening_message"]
+
+
+@pytest.fixture
+def client_html_shell(monkeypatch):
+    """Fetched page has no JSON-LD but visible text — extractor fills the gaps."""
+
+    async def fake_fetch(url: str) -> str:
+        return HTML_SHELL_NO_LD
+
+    async def fake_geocode(address, postcode=None, **kw):
+        return GeoLocation(
+            lat=48.8676,
+            lon=2.3636,
+            address_normalized="5 rue du Faubourg du Temple, 75011 Paris",
+            score=0.95,
+            id_parcelle=None,
+            code_iris="751114001",
+            nom_iris="République",
+            code_commune="75111",
+            code_postal="75011",
+        )
+
+    async def fake_dpe(*a, **kw):
+        return DPEReport(dpe_class="D", surface_m2=65.0, year_certified=2023)
+
+    async def fake_nbh(*a, **kw):
+        return Neighborhood(iris_code="751114001", iris_name="République")
+
+    monkeypatch.setattr(listing_parser, "fetch", fake_fetch)
+    monkeypatch.setattr(geocoder, "geocode", fake_geocode)
+    monkeypatch.setattr(dpe, "lookup", fake_dpe)
+    monkeypatch.setattr(neighborhood, "enrich", fake_nbh)
+    return TestClient(app)
+
+
+def test_analyze_url_falls_back_to_html_extraction(client_html_shell):
+    r = client_html_shell.post(
+        "/analyze",
+        json={"content": "https://www.bienici.com/annonce/test"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["listing"]["price_eur"] == 720_000
+    assert body["listing"]["surface_m2"] == 65
+    assert "Complément" in " ".join(body.get("warnings", []))

@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { analyze, formatEur } from "@/lib/api";
-import type { AnalyzeResponse } from "@/lib/types";
+import { analyzeStream, formatEur } from "@/lib/api";
+import type { AnalyzeResponse, Listing } from "@/lib/types";
 import { PriceCard } from "@/components/PriceCard";
 import { ComparablesMap } from "@/components/ComparablesMap";
 import { BuildingHistory } from "@/components/BuildingHistory";
 import { DPECard } from "@/components/DPECard";
 import { NeighborhoodCard } from "@/components/NeighborhoodCard";
 import { NegotiationScript } from "@/components/NegotiationScript";
+import { ComparablesTable } from "@/components/ComparablesTable";
+import { ListingPreview } from "@/components/ListingPreview";
 import { Card, CardLabel, CardTitle } from "@/components/Card";
 
 export default function VerdictView() {
   const params = useSearchParams();
   const router = useRouter();
   const id = params.get("id");
-  // Legacy support: ?url=... still works for direct linking.
   const legacyUrl = params.get("url");
+  const [listing, setListing] = useState<Listing | null>(null);
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let content: string | null = null;
@@ -48,10 +51,35 @@ export default function VerdictView() {
 
     setLoading(true);
     setErr(null);
-    analyze(content, sourceUrl)
-      .then(setData)
-      .catch((e: Error) => setErr(e.message))
-      .finally(() => setLoading(false));
+    setListing(null);
+    setData(null);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    analyzeStream(
+      content,
+      sourceUrl,
+      {
+        onListing: (l) => setListing(l),
+        onVerdict: (d) => {
+          setData(d);
+          setLoading(false);
+        },
+        onError: (detail) => {
+          setErr(detail);
+          setLoading(false);
+        },
+      },
+      abort.signal,
+    ).catch((e: Error) => {
+      if (e.name !== "AbortError") {
+        setErr(e.message);
+        setLoading(false);
+      }
+    });
+
+    return () => abort.abort();
   }, [id, legacyUrl]);
 
   if (!id && !legacyUrl) {
@@ -72,7 +100,8 @@ export default function VerdictView() {
         Nouvelle analyse
       </button>
 
-      {loading && <LoadingState />}
+      {loading && !listing && <LoadingState />}
+      {loading && listing && <ListingPreview listing={listing} />}
       {err && (
         <Card>
           <CardLabel>Erreur</CardLabel>
@@ -159,7 +188,7 @@ function Results({ data }: { data: AnalyzeResponse }) {
 
       {negotiation && <NegotiationScript script={negotiation} />}
 
-      <CompsTable comps={comps} />
+      <ComparablesTable comps={comps} listing={listing} />
 
       {valuation.fair_value_eur && listing.price_eur ? (
         <div className="text-xs text-[var(--muted)] text-center pt-4">
@@ -171,90 +200,3 @@ function Results({ data }: { data: AnalyzeResponse }) {
   );
 }
 
-function CompsTable({ comps }: { comps: AnalyzeResponse["comps"] }) {
-  const sorted = comps.slice().sort((a, b) => {
-    const order = { building: 0, street: 1, iris: 2, none: 3 } as const;
-    const ta = order[a.tier as keyof typeof order];
-    const tb = order[b.tier as keyof typeof order];
-    if (ta !== tb) return ta - tb;
-    return new Date(b.date_mutation).getTime() - new Date(a.date_mutation).getTime();
-  });
-
-  if (sorted.length === 0) {
-    return (
-      <Card>
-        <CardLabel>Comparables</CardLabel>
-        <p className="text-sm text-[var(--muted)] mt-2">
-          Aucun comparable trouvé. Le bien peut être atypique, ou la base
-          DVF n&apos;est pas encore à jour pour cette adresse.
-        </p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardLabel>Toutes les ventes comparables ({sorted.length})</CardLabel>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-[var(--muted)] text-xs uppercase tracking-wider">
-            <tr className="border-b border-[var(--border)]">
-              <th className="text-left py-2 font-medium">Tier</th>
-              <th className="text-left py-2 font-medium">Adresse</th>
-              <th className="text-left py-2 font-medium">Date</th>
-              <th className="text-right py-2 font-medium">Prix</th>
-              <th className="text-right py-2 font-medium">Surface</th>
-              <th className="text-right py-2 font-medium">€/m²</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.slice(0, 30).map((c) => (
-              <tr key={c.id_mutation} className="border-b border-[var(--border)]/40">
-                <td className="py-2">
-                  <TierBadge tier={c.tier} />
-                </td>
-                <td className="py-2">
-                  {c.adresse ?? "—"}
-                  {c.code_postal ? (
-                    <span className="text-[var(--muted)] text-xs ml-1">
-                      {c.code_postal}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="py-2 font-mono">
-                  {new Date(c.date_mutation).toLocaleDateString("fr-FR")}
-                </td>
-                <td className="py-2 text-right font-mono">
-                  {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(c.valeur_fonciere)}
-                </td>
-                <td className="py-2 text-right font-mono">
-                  {c.surface_reelle_bati ? `${c.surface_reelle_bati} m²` : "—"}
-                </td>
-                <td className="py-2 text-right font-mono">
-                  {c.price_per_m2
-                    ? `${Math.round(c.price_per_m2).toLocaleString("fr-FR")} €`
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-}
-
-function TierBadge({ tier }: { tier: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    building: { label: "Immeuble", className: "bg-purple-100 text-purple-800" },
-    street: { label: "Rue", className: "bg-blue-100 text-blue-800" },
-    iris: { label: "Quartier", className: "bg-gray-100 text-gray-700" },
-    none: { label: "—", className: "bg-gray-100 text-gray-500" },
-  };
-  const v = map[tier] ?? map.none;
-  return (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${v.className}`}>
-      {v.label}
-    </span>
-  );
-}

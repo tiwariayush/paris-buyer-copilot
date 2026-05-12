@@ -13,6 +13,7 @@ amount of structured data for SEO; we lean on that to stay legally clean
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -23,6 +24,8 @@ from selectolax.parser import HTMLParser
 
 from ..config import settings
 from ..models.schemas import Listing
+
+log = logging.getLogger(__name__)
 
 _PORTALS = {
     "bienici.com": "Bien'ici",
@@ -45,6 +48,7 @@ def detect_portal(url: str) -> str:
 
 async def fetch(url: str) -> str:
     cfg = settings()
+    host = urlparse(url).hostname or ""
     async with httpx.AsyncClient(
         headers={
             "User-Agent": cfg.user_agent,
@@ -53,8 +57,24 @@ async def fetch(url: str) -> str:
         timeout=cfg.request_timeout_s,
         follow_redirects=True,
     ) as client:
+        log.info("listing_fetch_start host=%s url=%s", host, url[:200])
         resp = await client.get(url)
+        if resp.status_code >= 400:
+            body_preview = (resp.text or "")[:400].replace("\n", " ")
+            log.warning(
+                "listing_fetch_http_error host=%s status=%s bytes=%s preview=%r",
+                host,
+                resp.status_code,
+                len(resp.content or b""),
+                body_preview,
+            )
         resp.raise_for_status()
+        log.info(
+            "listing_fetch_ok host=%s status=%s html_bytes=%s",
+            host,
+            resp.status_code,
+            len(resp.text or ""),
+        )
         return resp.text
 
 
@@ -281,6 +301,222 @@ def _from_bienici(html: str) -> dict[str, Any]:
     return {k: v for k, v in out.items() if v not in (None, "", [])}
 
 
+def _bienici_ad_id_from_url(url: str) -> str | None:
+    """Extract the ad ID from a Bien'ici listing URL."""
+    m = re.search(r"/annonce/[^/]+/[^/]+/[^/]+/[^/]+/([\w-]+)", url)
+    return m.group(1) if m else None
+
+
+def _from_bienici_api(ad: dict[str, Any]) -> dict[str, Any]:
+    """Map Bien'ici JSON API response to our Listing fields."""
+    out: dict[str, Any] = {}
+    out["title"] = ad.get("title")
+    out["description"] = ad.get("description")
+    out["price_eur"] = _to_float(ad.get("price"))
+    out["surface_m2"] = _to_float(ad.get("surfaceArea"))
+    out["rooms"] = _to_int(ad.get("roomsQuantity"))
+    out["bedrooms"] = _to_int(ad.get("bedroomsQuantity"))
+    out["postal_code"] = ad.get("postalCode")
+    out["city"] = ad.get("city")
+    out["dpe_class"] = ad.get("energyClassification")
+    out["floor"] = _to_int(ad.get("floor"))
+    out["has_elevator"] = ad.get("hasElevator")
+
+    district = ad.get("district") or {}
+    district_name = district.get("libelle") or district.get("name") or ""
+    city = ad.get("city") or ""
+    pc = ad.get("postalCode") or ""
+    parts = [p for p in (district_name, city, pc) if p]
+    out["address_raw"] = ", ".join(parts) if parts else None
+
+    # Try to get street from title (often "... – RUE DE X / QUARTIER Y")
+    title = ad.get("title") or ""
+    addr_m = re.search(
+        r"(?:rue|avenue|bd|boulevard|place|impasse|quai|passage)"
+        r"\s+[A-Za-zÀ-ÖØ-öø-ÿ' \-]+",
+        title,
+        flags=re.IGNORECASE,
+    )
+    if addr_m:
+        out["address_raw"] = f"{addr_m.group(0).strip()}, {pc}" if pc else addr_m.group(0).strip()
+
+    photos = []
+    for p in ad.get("photos", []):
+        url = p.get("url") or p.get("url_photo")
+        if url:
+            photos.append(url)
+    if photos:
+        out["photos"] = photos
+
+    return {k: v for k, v in out.items() if v not in (None, "", [])}
+
+
+async def _fetch_bienici_api(ad_id: str) -> dict[str, Any] | None:
+    """Fetch listing data from Bien'ici's JSON API."""
+    cfg = settings()
+    api_url = f"https://www.bienici.com/realEstateAd.json?id={ad_id}"
+    try:
+        async with httpx.AsyncClient(
+            headers={
+                "User-Agent": cfg.user_agent,
+                "Accept": "application/json",
+                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
+            },
+            timeout=cfg.request_timeout_s,
+            follow_redirects=True,
+        ) as client:
+            resp = await client.get(api_url)
+            if resp.status_code == 200:
+                log.info("bienici_api_ok ad_id=%s", ad_id)
+                return resp.json()
+            log.warning("bienici_api_error ad_id=%s status=%s", ad_id, resp.status_code)
+    except Exception as exc:
+        log.warning("bienici_api_exception ad_id=%s err=%s", ad_id, exc)
+    return None
+
+
+def _from_seloger(html: str) -> dict[str, Any]:
+    """SeLoger embeds classified data in __UFRN_LIFECYCLE_SERVERREQUEST__."""
+    m = re.search(
+        r'window\["__UFRN_LIFECYCLE_SERVERREQUEST__"\]\s*=\s*JSON\.parse\("(.*?)"\);',
+        html,
+        flags=re.DOTALL,
+    )
+    if not m:
+        return {}
+    try:
+        unescaped = m.group(1).encode().decode("unicode_escape")
+        data = json.loads(unescaped)
+    except Exception:
+        return {}
+
+    classified = data.get("app_cldp", {}).get("data", {}).get("classified", {})
+    if not classified:
+        return {}
+
+    sections = classified.get("sections", {})
+    tracking = classified.get("tracking", {})
+    raw_data = classified.get("rawData", {})
+    out: dict[str, Any] = {}
+
+    # Title from mainDescription or hardFacts
+    main_desc = sections.get("mainDescription", {})
+    out["title"] = main_desc.get("headline")
+
+    # Description
+    desc_section = sections.get("description", {})
+    out["description"] = desc_section.get("description")
+
+    # Price: extract from tracking (cleanest) or price section aria label
+    items = tracking.get("av_items", [])
+    if items and isinstance(items, list):
+        out["price_eur"] = _to_float(items[0].get("price"))
+    if not out.get("price_eur"):
+        price_section = sections.get("price", {})
+        base_price = price_section.get("base", {}).get("main", {})
+        aria = base_price.get("value", {}).get("main", {}).get("ariaLabel", "")
+        out["price_eur"] = _to_float(re.sub(r"[^\d]", "", aria)) if aria else None
+
+    # Surface, rooms, bedrooms from hardFacts "facts" array
+    hard_facts = sections.get("hardFacts", {})
+    for fact in hard_facts.get("facts", []):
+        ftype = fact.get("type", "")
+        split_val = fact.get("splitValue", "")
+        if ftype in ("livingSpace", "surface"):
+            out["surface_m2"] = _to_float(split_val)
+        elif ftype == "numberOfRooms":
+            out["rooms"] = _to_int(split_val)
+        elif ftype == "numberOfBedrooms":
+            out["bedrooms"] = _to_int(split_val)
+
+    # Location
+    loc = sections.get("location", {})
+    addr = loc.get("address", {})
+    out["postal_code"] = addr.get("zipCode")
+    city = addr.get("city", "")
+    district = addr.get("district", "")
+    out["city"] = city
+    parts = [p for p in (district, city, addr.get("zipCode", "")) if p]
+    out["address_raw"] = ", ".join(parts) if parts else None
+
+    # DPE: from energy section or tracking
+    energy = sections.get("energy", {})
+    cert = energy.get("certificate", {})
+    out["dpe_class"] = cert.get("value") if cert.get("value") else None
+    if not out.get("dpe_class"):
+        out["dpe_class"] = tracking.get("av_energy_certificate")
+
+    # Floor and elevator from features preview
+    features = sections.get("features", {})
+    for feat in features.get("preview", []):
+        icon = feat.get("icon", "")
+        val = feat.get("value", "")
+        if icon == "elevator":
+            out["has_elevator"] = True
+        elif icon == "floors":
+            floor_m = re.match(r"(\d+)", val)
+            if floor_m:
+                out["floor"] = int(floor_m.group(1))
+
+    # Photos
+    gallery = sections.get("gallery", {})
+    photos = []
+    for img in gallery.get("images", []):
+        url = img.get("url")
+        if url:
+            photos.append(url)
+    if photos:
+        out["photos"] = photos
+
+    return {k: v for k, v in out.items() if v not in (None, "", [])}
+
+
+def _from_pap(html: str) -> dict[str, Any]:
+    """PAP is server-rendered with structured HTML elements."""
+    parser = HTMLParser(html)
+    out: dict[str, Any] = {}
+
+    # Rooms, bedrooms, surface from .item-tags <li> elements
+    tags_ul = parser.css_first(".item-tags")
+    if tags_ul:
+        for li in tags_ul.css("li"):
+            text = (li.text() or "").strip()
+            m = re.match(r"(\d+)\s*pi[èe]ces?", text, re.IGNORECASE)
+            if m:
+                out["rooms"] = int(m.group(1))
+                continue
+            m = re.match(r"(\d+)\s*chambres?", text, re.IGNORECASE)
+            if m:
+                out["bedrooms"] = int(m.group(1))
+                continue
+            m = re.match(r"([\d.,]+)\s*m[²2]", text)
+            if m:
+                out["surface_m2"] = float(m.group(1).replace(",", "."))
+                continue
+
+    # DPE: the active <li> inside .energy-indice
+    energy_div = parser.css_first(".energy-indice")
+    if energy_div:
+        active = energy_div.css_first("li.active")
+        if active:
+            letter = (active.text() or "").strip().upper()
+            if letter in "ABCDEFG":
+                out["dpe_class"] = letter
+
+    # Floor and elevator from description text
+    desc_div = parser.css_first(".item-description")
+    desc_text = (desc_div.text() if desc_div else "") or ""
+    m = re.search(r"(\d{1,2})\s*[eè](?:me)?\s*[ée]tage", desc_text, re.IGNORECASE)
+    if m:
+        out["floor"] = int(m.group(1))
+    if re.search(r"sans\s+ascenseur|pas\s+d['\xe9e]\s*ascenseur", desc_text, re.IGNORECASE):
+        out["has_elevator"] = False
+    elif re.search(r"\bascenseur\b", desc_text, re.IGNORECASE):
+        out["has_elevator"] = True
+
+    return {k: v for k, v in out.items() if v not in (None, "", [])}
+
+
 # ------------------------------- public ------------------------------------
 
 def parse_html(html: str, url: str) -> Listing:
@@ -294,6 +530,10 @@ def parse_html(html: str, url: str) -> Listing:
         portal_extra = _from_leboncoin(html)
     elif portal == "Bien'ici":
         portal_extra = _from_bienici(html)
+    elif portal == "SeLoger":
+        portal_extra = _from_seloger(html)
+    elif portal == "PAP":
+        portal_extra = _from_pap(html)
 
     # Heuristic DPE extraction from description if still missing.
     if not base.get("dpe_class") and not portal_extra.get("dpe_class"):
