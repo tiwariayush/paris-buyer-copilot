@@ -19,6 +19,7 @@ from ..services import (
     geocoder,
     listing_parser,
     neighborhood,
+    quality,
     valuation,
 )
 
@@ -355,13 +356,21 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         listing, val, comps, delta_pct, delta_eur, dpe_report
     )
 
+    quality_warnings = quality.run_all_checks(
+        listing, location, val, comps, dpe_report
+    )
+    for qw in quality_warnings:
+        warnings.append(f"[{qw.severity}] {qw.message_fr}")
+
     log.info(
-        "analyze_done trace_id=%s fair_value_eur=%s n_comps=%s tier=%s n_warnings=%d",
+        "analyze_done trace_id=%s fair_value_eur=%s n_comps=%s tier=%s "
+        "n_warnings=%d n_quality_warnings=%d",
         trace_id,
         val.fair_value_eur,
         val.n_comps,
         val.base_tier,
         len(warnings),
+        len(quality_warnings),
     )
 
     return AnalyzeResponse(
@@ -476,6 +485,12 @@ async def analyze_stream(request: Request) -> StreamingResponse:
         negotiation = await ai.negotiate(
             listing, val, comps, delta_pct, delta_eur, dpe_report
         )
+
+        quality_warnings = quality.run_all_checks(
+            listing, location, val, comps, dpe_report
+        )
+        for qw in quality_warnings:
+            warnings.append(f"[{qw.severity}] {qw.message_fr}")
 
         log.info(
             "analyze_stream_done trace_id=%s fair_value=%s n_comps=%s tier=%s",
