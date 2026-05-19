@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import analyze, health
+from .api import analyze, feedback, health
 from .config import settings
 from .logging_setup import configure_app_logging
 
@@ -33,3 +33,4 @@ app.add_middleware(
 
 app.include_router(health.router, tags=["meta"])
 app.include_router(analyze.router, tags=["analyze"])
+app.include_router(feedback.router, tags=["feedback"])

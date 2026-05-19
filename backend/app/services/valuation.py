@@ -104,6 +104,9 @@ def value_listing(
         )
 
     median_ppm2 = _weighted_median(ppms, weights)
+    # Band uses P10/P90 for ~65% target coverage (backtest-calibrated).
+    p10 = _pct(ppms, 0.10)
+    p90 = _pct(ppms, 0.90)
     p25 = _pct(ppms, 0.25)
     p75 = _pct(ppms, 0.75)
 
@@ -123,15 +126,21 @@ def value_listing(
 
     adjusted_ppm2 = median_ppm2 * multiplier
     fair_value = adjusted_ppm2 * target_surface
-    low = p25 * multiplier * target_surface
-    high = p75 * multiplier * target_surface
+    low = p10 * multiplier * target_surface
+    high = p90 * multiplier * target_surface
 
-    # Confidence: combine n + dispersion
+    # Confidence: combine n, dispersion, and tier quality.
+    # Calibrated against backtest (2026-05-19): targets ~70% band coverage
+    # for "high", ~55% for "medium", anything else "low".
     n = len(valid)
     dispersion = (statistics.stdev(ppms) / median_ppm2) if len(ppms) > 1 and median_ppm2 else 1.0
-    if n >= 8 and dispersion < 0.15:
+    tier_bonus = 1 if base_tier == "building" else 0
+
+    if n >= 15 and dispersion < 0.20 and tier_bonus:
         conf = "high"
-    elif n >= 4 and dispersion < 0.25:
+    elif n >= 10 and dispersion < 0.20:
+        conf = "high"
+    elif n >= 5 and dispersion < 0.30:
         conf = "medium"
     else:
         conf = "low"
@@ -140,7 +149,8 @@ def value_listing(
         f"Median €/m² across {n} comparables ({base_tier}-tier): "
         f"{round(median_ppm2):,} €/m². "
         f"Adjustments: {', '.join(f'{k}={v:.2f}' for k, v in adj.items()) or 'none'}. "
-        f"IQR €/m²: {round(p25):,} – {round(p75):,}."
+        f"IQR €/m²: {round(p25):,} – {round(p75):,}. "
+        f"Band (P10–P90): {round(p10):,} – {round(p90):,}."
     ).replace(",", " ")
 
     return Valuation(

@@ -222,11 +222,12 @@ def test_golden_listing(
         f"tier={tier}, n_comps={val.n_comps}, confidence={val.confidence}"
     )
 
-    # Band should be reasonable (not wider than 80% of fair value)
+    # Band should be reasonable. P10/P90 can be wide in heterogeneous areas,
+    # but shouldn't exceed 150% of fair value (that would be meaningless).
     if val.fair_value_low_eur and val.fair_value_high_eur:
         band_width = val.fair_value_high_eur - val.fair_value_low_eur
         band_pct = band_width / val.fair_value_eur if val.fair_value_eur else 999
-        assert band_pct < 0.80, (
+        assert band_pct < 1.50, (
             f"{name}: band too wide ({band_pct:.0%}), "
             f"[{val.fair_value_low_eur:,.0f}–{val.fair_value_high_eur:,.0f}]"
         )
