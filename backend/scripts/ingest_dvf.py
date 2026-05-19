@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT))
 from app.config import settings  # noqa: E402
 
 CSV_URL = "https://files.data.gouv.fr/geo-dvf/latest/csv/{year}/full.csv.gz"
-DEFAULT_YEARS = list(range(2020, 2026))
+DEFAULT_YEARS = list(range(2020, 2027))  # 2020–2026 when published on data.gouv.fr
 
 PARIS_COMMUNES = [str(75100 + a) for a in range(1, 21)]  # 75101..75120
 

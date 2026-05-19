@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpDown,
   ArrowUp,
@@ -82,19 +82,25 @@ function formatDistance(m: number | null | undefined): string {
   return `${(m / 1000).toFixed(1)} km`;
 }
 
+const INITIAL_VISIBLE = 40;
+const SHOW_MORE_STEP = 40;
+
 export function ComparablesTable({
   comps,
   listing,
   onHighlight,
+  dvfLatest,
 }: {
   comps: Comp[];
   listing: Listing;
   onHighlight?: (comp: Comp | null) => void;
+  dvfLatest?: string | null;
 }) {
   const [sortField, setSortField] = useState<SortField>("distance");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
 
   const listingPrice = listing.price_eur ?? 0;
   const listingSurface = listing.surface_m2 ?? 0;
@@ -154,6 +160,13 @@ export function ComparablesTable({
     });
     return arr;
   }, [filtered, sortField, sortDir, listingPrice, listingSurface]);
+
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [filters, sortField, sortDir]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -264,7 +277,7 @@ export function ComparablesTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((c) => (
+            {visible.map((c) => (
               <tr
                 key={c.id_mutation}
                 className="border-b border-[var(--border)]/40 hover:bg-[var(--accent-soft)]/40 transition-colors cursor-pointer"
@@ -309,6 +322,28 @@ export function ComparablesTable({
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((n) => Math.min(n + SHOW_MORE_STEP, sorted.length))
+            }
+            className="text-sm font-medium text-[var(--accent)] hover:underline"
+          >
+            Afficher plus ({sorted.length - visibleCount} restantes)
+          </button>
+        </div>
+      )}
+
+      {dvfLatest && (
+        <p className="mt-3 text-[11px] text-[var(--muted)] text-center">
+          Source DVF (Etalab) · ventes jusqu&apos;au{" "}
+          {new Date(dvfLatest).toLocaleDateString("fr-FR")}
+          {" · "}recherche sur ~7 ans (immeuble, rue, rayon 750 m)
+        </p>
+      )}
 
       {sorted.length === 0 && filtered.length === 0 && (
         <div className="text-center py-6 text-sm text-[var(--muted)]">

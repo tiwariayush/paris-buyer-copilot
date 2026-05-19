@@ -166,4 +166,5 @@ class AnalyzeResponse(BaseModel):
     premium_features: PremiumFeatures | None = None
     delta_pct: float | None = None
     delta_eur: float | None = None
+    dvf_latest: str | None = None
     warnings: list[str] = Field(default_factory=list)

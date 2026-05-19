@@ -307,7 +307,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
     )
 
     type_local = "Appartement"
-    comps, base_tier = dvf.find_comps(
+    comp_args = dict(
         id_parcelle=location.id_parcelle if location else None,
         voie=voie,
         code_postal=code_postal,
@@ -316,9 +316,12 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         surface=listing.surface_m2,
         type_local=type_local,
     )
+    comps, base_tier = dvf.find_comps(**comp_args)
+    display_comps = dvf.find_display_comps(**comp_args)
 
     if location:
         _fill_distances(comps, location.lon, location.lat)
+        _fill_distances(display_comps, location.lon, location.lat)
 
     building_hist: list = []
     if location and location.id_parcelle:
@@ -401,11 +404,13 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         len(quality_warnings),
     )
 
+    dvf_meta = dvf.stats()
+
     return AnalyzeResponse(
         listing=listing,
         location=location,
         valuation=val,
-        comps=comps[:30],
+        comps=display_comps,
         building_history=building_hist[:20],
         dpe=dpe_report,
         neighborhood=nbh,
@@ -415,6 +420,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         premium_features=premium,
         delta_pct=delta_pct,
         delta_eur=delta_eur,
+        dvf_latest=dvf_meta.get("latest"),
         warnings=warnings,
     )
 
@@ -466,7 +472,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
         )
 
         type_local = "Appartement"
-        comps, base_tier = dvf.find_comps(
+        comp_args = dict(
             id_parcelle=location.id_parcelle if location else None,
             voie=voie,
             code_postal=code_postal,
@@ -475,9 +481,12 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             surface=listing.surface_m2,
             type_local=type_local,
         )
+        comps, base_tier = dvf.find_comps(**comp_args)
+        display_comps = dvf.find_display_comps(**comp_args)
 
         if location:
             _fill_distances(comps, location.lon, location.lat)
+            _fill_distances(display_comps, location.lon, location.lat)
 
         building_hist: list = []
         if location and location.id_parcelle:
@@ -554,11 +563,13 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             trace_id, val.fair_value_eur, val.n_comps, val.base_tier,
         )
 
+        dvf_meta = dvf.stats()
+
         result = AnalyzeResponse(
             listing=listing,
             location=location,
             valuation=val,
-            comps=comps[:30],
+            comps=display_comps,
             building_history=building_hist[:20],
             dpe=dpe_report,
             neighborhood=nbh,
@@ -568,6 +579,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             premium_features=premium,
             delta_pct=delta_pct,
             delta_eur=delta_eur,
+            dvf_latest=dvf_meta.get("latest"),
             warnings=warnings,
         )
         yield _sse_event("verdict", result.model_dump(mode="json"))

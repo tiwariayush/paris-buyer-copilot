@@ -145,5 +145,6 @@ export interface AnalyzeResponse {
   premium_features?: PremiumFeatures | null;
   delta_pct?: number | null;
   delta_eur?: number | null;
+  dvf_latest?: string | null;
   warnings: string[];
 }

@@ -207,7 +207,11 @@ function Results({ data }: { data: AnalyzeResponse }) {
 
       {negotiation && <NegotiationScript script={negotiation} />}
 
-      <ComparablesTable comps={comps} listing={listing} />
+      <ComparablesTable
+        comps={comps}
+        listing={listing}
+        dvfLatest={data.dvf_latest}
+      />
 
       {valuation.fair_value_eur && listing.price_eur ? (
         <div className="text-xs text-[var(--muted)] text-center pt-4">

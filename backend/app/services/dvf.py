@@ -60,6 +60,7 @@ def building_comps(
     *,
     months: int = 36,
     type_local: str = "Appartement",
+    limit: int = 50,
 ) -> list[Comp]:
     if not id_parcelle:
         return []
@@ -72,11 +73,11 @@ def building_comps(
           AND type_local = ?
           AND price_per_m2 >= ?
         ORDER BY date_mutation DESC
-        LIMIT 50;
+        LIMIT ?;
     """
     with cursor() as cur:
         rows = cur.execute(
-            sql, [id_parcelle, cutoff, type_local, PARIS_PPM2_FLOOR]
+            sql, [id_parcelle, cutoff, type_local, PARIS_PPM2_FLOOR, limit]
         ).fetchall()
     return [_row_to_comp(r, "building") for r in rows]
 
@@ -89,6 +90,7 @@ def street_comps(
     months: int = 24,
     type_local: str = "Appartement",
     surface_tolerance: float = 0.3,
+    limit: int = 50,
 ) -> list[Comp]:
     if not voie or not code_postal:
         return []
@@ -105,14 +107,14 @@ def street_comps(
           AND surface_reelle_bati BETWEEN ? AND ?
           AND price_per_m2 >= ?
         ORDER BY date_mutation DESC
-        LIMIT 50;
+        LIMIT ?;
     """
     with cursor() as cur:
         rows = cur.execute(
             sql,
             [
                 code_postal, voie.upper(), cutoff, type_local,
-                smin, smax, PARIS_PPM2_FLOOR,
+                smin, smax, PARIS_PPM2_FLOOR, limit,
             ],
         ).fetchall()
     return [_row_to_comp(r, "street") for r in rows]
@@ -239,6 +241,67 @@ def find_comps(
     if combined:
         return combined, "iris" if not building else ("building" if len(building) >= 3 else "iris")
     return [], "none"
+
+
+def find_display_comps(
+    *,
+    id_parcelle: str | None,
+    voie: str | None,
+    code_postal: str | None,
+    lon: float | None,
+    lat: float | None,
+    surface: float | None,
+    type_local: str = "Appartement",
+    max_results: int = 150,
+) -> list[Comp]:
+    """Broader merge of building + street + radius comps for the UI table.
+
+    Unlike find_comps(), does not stop at the first tier — surfaces up to
+    ~7 years of DVF history (subject to what is ingested in DuckDB).
+    """
+    surface = surface or 50.0
+    seen: set[str] = set()
+    merged: list[Comp] = []
+
+    def _add(batch: list[Comp]) -> None:
+        for c in batch:
+            if c.id_mutation in seen:
+                continue
+            seen.add(c.id_mutation)
+            merged.append(c)
+
+    if id_parcelle:
+        _add(
+            building_comps(
+                id_parcelle, months=84, limit=100, type_local=type_local
+            )
+        )
+    if voie and code_postal:
+        _add(
+            street_comps(
+                voie,
+                code_postal,
+                surface,
+                months=60,
+                limit=100,
+                type_local=type_local,
+            )
+        )
+    if lon is not None and lat is not None:
+        _add(
+            radius_comps(
+                lon,
+                lat,
+                surface,
+                months=60,
+                limit=120,
+                radius_m=750,
+                type_local=type_local,
+            )
+        )
+
+    merged.sort(key=lambda c: c.date_mutation, reverse=True)
+    return merged[:max_results]
 
 
 def stats() -> dict[str, Any]:
