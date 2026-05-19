@@ -184,6 +184,28 @@ def _cos_deg(deg: float) -> float:
     return math.cos(math.radians(deg))
 
 
+def building_history(id_parcelle: str) -> list[Comp]:
+    """ALL transactions for a building (any type/surface), ordered by date desc.
+
+    Unlike building_comps() which filters by type_local and price floor,
+    this returns the full transaction record as a trust signal for the user.
+    """
+    if not id_parcelle:
+        return []
+    sql = f"""
+        SELECT {_BASE_COLS}
+        FROM mutations
+        WHERE id_parcelle = ?
+          AND surface_reelle_bati IS NOT NULL
+          AND price_per_m2 IS NOT NULL
+        ORDER BY date_mutation DESC
+        LIMIT 100;
+    """
+    with cursor() as cur:
+        rows = cur.execute(sql, [id_parcelle]).fetchall()
+    return [_row_to_comp(r, "building") for r in rows]
+
+
 def find_comps(
     *,
     id_parcelle: str | None,

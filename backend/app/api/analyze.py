@@ -18,6 +18,7 @@ from ..services import (
     extractor,
     geocoder,
     listing_parser,
+    market_index,
     neighborhood,
     quality,
     valuation,
@@ -317,6 +318,10 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
     if location:
         _fill_distances(comps, location.lon, location.lat)
 
+    building_hist: list = []
+    if location and location.id_parcelle:
+        building_hist = dvf.building_history(location.id_parcelle)
+
     val = valuation.value_listing(listing, comps, base_tier)
 
     delta_eur = None
@@ -362,6 +367,10 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
     for qw in quality_warnings:
         warnings.append(f"[{qw.severity}] {qw.message_fr}")
 
+    mkt_index = market_index.compute_market_position(
+        listing.price_eur, listing.surface_m2, code_postal
+    )
+
     log.info(
         "analyze_done trace_id=%s fair_value_eur=%s n_comps=%s tier=%s "
         "n_warnings=%d n_quality_warnings=%d",
@@ -378,9 +387,11 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         location=location,
         valuation=val,
         comps=comps[:30],
+        building_history=building_hist[:20],
         dpe=dpe_report,
         neighborhood=nbh,
         negotiation=negotiation,
+        market_index=mkt_index,
         delta_pct=delta_pct,
         delta_eur=delta_eur,
         warnings=warnings,
@@ -447,6 +458,10 @@ async def analyze_stream(request: Request) -> StreamingResponse:
         if location:
             _fill_distances(comps, location.lon, location.lat)
 
+        building_hist: list = []
+        if location and location.id_parcelle:
+            building_hist = dvf.building_history(location.id_parcelle)
+
         val = valuation.value_listing(listing, comps, base_tier)
 
         delta_eur = None
@@ -492,6 +507,10 @@ async def analyze_stream(request: Request) -> StreamingResponse:
         for qw in quality_warnings:
             warnings.append(f"[{qw.severity}] {qw.message_fr}")
 
+        mkt_index = market_index.compute_market_position(
+            listing.price_eur, listing.surface_m2, code_postal
+        )
+
         log.info(
             "analyze_stream_done trace_id=%s fair_value=%s n_comps=%s tier=%s",
             trace_id, val.fair_value_eur, val.n_comps, val.base_tier,
@@ -502,9 +521,11 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             location=location,
             valuation=val,
             comps=comps[:30],
+            building_history=building_hist[:20],
             dpe=dpe_report,
             neighborhood=nbh,
             negotiation=negotiation,
+            market_index=mkt_index,
             delta_pct=delta_pct,
             delta_eur=delta_eur,
             warnings=warnings,

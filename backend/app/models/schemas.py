@@ -95,6 +95,7 @@ class Neighborhood(BaseModel):
     median_household_income_eur: float | None = None
     population: int | None = None
     nearest_schools: list[dict] = Field(default_factory=list)
+    nearest_transit: list[dict] = Field(default_factory=list)
     transit: dict | None = None
 
 
@@ -111,14 +112,35 @@ class NegotiationScript(BaseModel):
     opening_message: str
 
 
+class MarketIndex(BaseModel):
+    arrondissement_median_ppm2: float
+    listing_vs_median_pct: float
+
+
+class PhotoAnalysis(BaseModel):
+    renovation_state: Literal["raw", "dated", "recent", "premium"]
+    view_quality: Literal["courtyard", "street", "panoramic", "unknown"]
+    natural_light: Literal["dark", "average", "bright"]
+
+
+class TransitStop(BaseModel):
+    name: str
+    line: str
+    distance_m: float
+    walk_minutes: float
+
+
 class AnalyzeResponse(BaseModel):
     listing: Listing
     location: GeoLocation | None = None
     valuation: Valuation
     comps: list[Comp]
+    building_history: list[Comp] = Field(default_factory=list)
     dpe: DPEReport | None = None
     neighborhood: Neighborhood | None = None
     negotiation: NegotiationScript | None = None
+    market_index: MarketIndex | None = None
+    photo_analysis: PhotoAnalysis | None = None
     delta_pct: float | None = None
     delta_eur: float | None = None
     warnings: list[str] = Field(default_factory=list)
