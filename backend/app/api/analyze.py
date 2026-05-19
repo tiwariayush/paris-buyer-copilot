@@ -21,6 +21,7 @@ from ..services import (
     market_index,
     neighborhood,
     photo_analysis,
+    premium_features,
     quality,
     valuation,
 )
@@ -338,12 +339,17 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         warnings.append(f"Photo analysis failed: {e}")
 
     renovation_state = photo_result.renovation_state if photo_result else None
+    premium = premium_features.merge_premium(listing, photo_result)
 
     if dpe_report and dpe_report.dpe_class and not listing.dpe_class:
         listing.dpe_class = dpe_report.dpe_class
 
     val = valuation.value_listing(
-        listing, comps, base_tier, renovation_state=renovation_state
+        listing,
+        comps,
+        base_tier,
+        renovation_state=renovation_state,
+        premium=premium,
     )
 
     delta_eur = None
@@ -366,7 +372,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
             warnings.append(f"Neighborhood lookup failed: {e}")
 
     negotiation = await ai.negotiate(
-        listing, val, comps, delta_pct, delta_eur, dpe_report
+        listing, val, comps, delta_pct, delta_eur, dpe_report, premium=premium
     )
 
     quality_warnings = quality.run_all_checks(
@@ -401,6 +407,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         negotiation=negotiation,
         market_index=mkt_index,
         photo_analysis=photo_result,
+        premium_features=premium,
         delta_pct=delta_pct,
         delta_eur=delta_eur,
         warnings=warnings,
@@ -486,12 +493,17 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             warnings.append(f"Photo analysis failed: {e}")
 
         renovation_state = photo_result.renovation_state if photo_result else None
+        premium = premium_features.merge_premium(listing, photo_result)
 
         if dpe_report and dpe_report.dpe_class and not listing.dpe_class:
             listing.dpe_class = dpe_report.dpe_class
 
         val = valuation.value_listing(
-            listing, comps, base_tier, renovation_state=renovation_state
+            listing,
+            comps,
+            base_tier,
+            renovation_state=renovation_state,
+            premium=premium,
         )
 
         delta_eur = None
@@ -514,7 +526,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
                 warnings.append(f"Neighborhood lookup failed: {e}")
 
         negotiation = await ai.negotiate(
-            listing, val, comps, delta_pct, delta_eur, dpe_report
+            listing, val, comps, delta_pct, delta_eur, dpe_report, premium=premium
         )
 
         quality_warnings = quality.run_all_checks(
@@ -543,6 +555,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             negotiation=negotiation,
             market_index=mkt_index,
             photo_analysis=photo_result,
+            premium_features=premium,
             delta_pct=delta_pct,
             delta_eur=delta_eur,
             warnings=warnings,

@@ -12,7 +12,7 @@ import math
 import statistics
 from datetime import date
 
-from ..models.schemas import Comp, Listing, Valuation
+from ..models.schemas import Comp, Listing, PremiumFeatures, Valuation
 
 DPE_MULTIPLIERS: dict[str, float] = {
     "A": 1.05,
@@ -29,6 +29,20 @@ RENOVATION_MULTIPLIERS: dict[str, float] = {
     "dated": 0.95,
     "recent": 1.00,
     "premium": 1.08,
+}
+
+# Views and light are not in DVF — applied when detected in listing copy/photos.
+VIEW_MULTIPLIERS: dict[str, float] = {
+    "landmark": 1.10,
+    "panoramic": 1.05,
+    "street": 1.00,
+    "courtyard": 0.97,
+}
+
+LIGHT_MULTIPLIERS: dict[str, float] = {
+    "exceptional": 1.04,
+    "bright": 1.03,
+    "dark": 0.96,
 }
 
 
@@ -70,12 +84,25 @@ def _pct(values: list[float], q: float) -> float:
     return s[f] * (c - k) + s[c] * (k - f)
 
 
+def _apply_multiplier(
+    adj: dict[str, float],
+    multiplier: float,
+    key: str,
+    factor: float,
+) -> float:
+    if factor == 1.0:
+        return multiplier
+    adj[key] = factor
+    return multiplier * factor
+
+
 def value_listing(
     listing: Listing,
     comps: list[Comp],
     base_tier: str,
     *,
     renovation_state: str | None = None,
+    premium: PremiumFeatures | None = None,
 ) -> Valuation:
     target_surface = listing.surface_m2
     if not comps or not target_surface or target_surface <= 0:
@@ -134,9 +161,17 @@ def value_listing(
         multiplier *= 1.04
     if renovation_state and renovation_state in RENOVATION_MULTIPLIERS:
         m = RENOVATION_MULTIPLIERS[renovation_state]
-        if m != 1.0:
-            adj[f"renovation_{renovation_state}"] = m
-            multiplier *= m
+        multiplier = _apply_multiplier(adj, multiplier, f"renovation_{renovation_state}", m)
+
+    if premium:
+        vt = premium.view_tier
+        if vt and vt != "none" and vt in VIEW_MULTIPLIERS:
+            m = VIEW_MULTIPLIERS[vt]
+            multiplier = _apply_multiplier(adj, multiplier, f"view_{vt}", m)
+        lt = premium.light_tier
+        if lt and lt not in ("none", "average") and lt in LIGHT_MULTIPLIERS:
+            m = LIGHT_MULTIPLIERS[lt]
+            multiplier = _apply_multiplier(adj, multiplier, f"light_{lt}", m)
 
     adjusted_ppm2 = median_ppm2 * multiplier
     fair_value = adjusted_ppm2 * target_surface

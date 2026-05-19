@@ -101,6 +101,13 @@ export interface NegotiationScript {
   opening_message: string;
 }
 
+export interface PremiumFeatures {
+  view_tier: "none" | "courtyard" | "street" | "panoramic" | "landmark";
+  light_tier: "none" | "dark" | "average" | "bright" | "exceptional";
+  highlights_fr: string[];
+  sources: string[];
+}
+
 export interface AnalyzeResponse {
   listing: Listing;
   location?: GeoLocation | null;
@@ -109,6 +116,7 @@ export interface AnalyzeResponse {
   dpe?: DPEReport | null;
   neighborhood?: Neighborhood | null;
   negotiation?: NegotiationScript | null;
+  premium_features?: PremiumFeatures | null;
   delta_pct?: number | null;
   delta_eur?: number | null;
   warnings: string[];

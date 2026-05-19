@@ -20,6 +20,7 @@ from ..models.schemas import (
     Listing,
     NegotiationLever,
     NegotiationScript,
+    PremiumFeatures,
     Valuation,
 )
 
@@ -37,6 +38,7 @@ def _fallback(
     delta_pct: float | None,
     dpe: DPEReport | None,
     comps: list[Comp],
+    premium: PremiumFeatures | None = None,
 ) -> NegotiationScript:
     levers: list[NegotiationLever] = []
     if delta_pct is not None and delta_pct > 0:
@@ -72,6 +74,19 @@ def _fallback(
                 detail="Frein notable à la liquidité, à intégrer au prix.",
                 impact_pct=-5,
                 strength="moderate",
+            )
+        )
+    if premium and premium.highlights_fr and delta_pct is not None and delta_pct > 3:
+        levers.append(
+            NegotiationLever(
+                title="Atouts premium détectés",
+                detail=(
+                    "L'estimation intègre déjà : "
+                    + ", ".join(premium.highlights_fr[:4])
+                    + ". Le surprix restant au-delà de ces ajustements reste discutable."
+                ),
+                impact_pct=None,
+                strength="weak",
             )
         )
     if not levers:
@@ -122,6 +137,7 @@ def _build_context(
     delta_eur: float | None,
     dpe: DPEReport | None,
     comps: list[Comp],
+    premium: PremiumFeatures | None = None,
 ) -> str:
     return json.dumps(
         {
@@ -130,6 +146,7 @@ def _build_context(
             "delta_pct": delta_pct,
             "delta_eur": delta_eur,
             "dpe": dpe.model_dump(mode="json") if dpe else None,
+            "premium_features": premium.model_dump(mode="json") if premium else None,
             "comparables": [c.model_dump(mode="json") for c in comps[:8]],
         },
         ensure_ascii=False,
@@ -144,17 +161,21 @@ async def negotiate(
     delta_pct: float | None,
     delta_eur: float | None,
     dpe: DPEReport | None,
+    *,
+    premium: PremiumFeatures | None = None,
 ) -> NegotiationScript:
     cfg = settings()
     if not cfg.openai_api_key:
-        return _fallback(listing, valuation, delta_pct, dpe, comps)
+        return _fallback(listing, valuation, delta_pct, dpe, comps, premium)
     try:
         from openai import AsyncOpenAI
     except ImportError:
-        return _fallback(listing, valuation, delta_pct, dpe, comps)
+        return _fallback(listing, valuation, delta_pct, dpe, comps, premium)
 
     client = AsyncOpenAI(api_key=cfg.openai_api_key)
-    context = _build_context(listing, valuation, delta_pct, delta_eur, dpe, comps)
+    context = _build_context(
+        listing, valuation, delta_pct, delta_eur, dpe, comps, premium
+    )
 
     schema: dict[str, Any] = {
         "type": "object",
@@ -212,4 +233,4 @@ async def negotiate(
         payload = json.loads(resp.choices[0].message.content or "{}")
         return NegotiationScript(**payload)
     except Exception:
-        return _fallback(listing, valuation, delta_pct, dpe, comps)
+        return _fallback(listing, valuation, delta_pct, dpe, comps, premium)

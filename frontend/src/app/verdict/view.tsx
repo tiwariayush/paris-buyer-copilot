@@ -13,6 +13,7 @@ import { NeighborhoodCard } from "@/components/NeighborhoodCard";
 import { NegotiationScript } from "@/components/NegotiationScript";
 import { ComparablesTable } from "@/components/ComparablesTable";
 import { ListingPreview } from "@/components/ListingPreview";
+import { PremiumFeaturesCard } from "@/components/PremiumFeaturesCard";
 import { Card, CardLabel, CardTitle } from "@/components/Card";
 
 export default function VerdictView() {
@@ -139,8 +140,19 @@ function LoadingState() {
 }
 
 function Results({ data }: { data: AnalyzeResponse }) {
-  const { listing, valuation, comps, dpe, neighborhood, negotiation, location, delta_pct, delta_eur, warnings } =
-    data;
+  const {
+    listing,
+    valuation,
+    comps,
+    dpe,
+    neighborhood,
+    negotiation,
+    location,
+    delta_pct,
+    delta_eur,
+    warnings,
+    premium_features,
+  } = data;
 
   return (
     <div className="space-y-6">
@@ -179,6 +191,12 @@ function Results({ data }: { data: AnalyzeResponse }) {
           <ComparablesMap comps={comps} target={location} />
         </div>
         <div className="space-y-6">
+          {premium_features && (
+            <PremiumFeaturesCard
+              premium={premium_features}
+              adjustments={valuation.adjustments}
+            />
+          )}
           <DPECard listing={listing} dpe={dpe} />
           <NeighborhoodCard data={neighborhood} />
         </div>

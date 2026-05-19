@@ -23,7 +23,7 @@ assess the following three attributes. Respond ONLY with a JSON object:
 
 {
   "renovation_state": "raw" | "dated" | "recent" | "premium",
-  "view_quality": "courtyard" | "street" | "panoramic" | "unknown",
+  "view_quality": "courtyard" | "street" | "panoramic" | "landmark" | "unknown",
   "natural_light": "dark" | "average" | "bright"
 }
 
@@ -31,7 +31,10 @@ Definitions:
 - renovation_state: "raw" = stripped/unfinished, "dated" = livable but old
   finishes (pre-2000), "recent" = renovated in last 10 years, "premium" =
   high-end materials/designer finish.
-- view_quality: assess from window views if visible; "unknown" if not shown.
+- view_quality: "landmark" if Eiffel Tower, Sacré-Coeur, Notre-Dame or similar
+  monument is clearly visible from windows; "panoramic" = wide open skyline;
+  "street" = typical street view; "courtyard" = inner courtyard; "unknown"
+  if windows/views not shown.
 - natural_light: based on visible light in rooms; "dark" = few/small windows
   or north-facing, "bright" = abundant natural light flooding in.
 """
@@ -94,7 +97,9 @@ async def analyze_photos(
                 parsed.get("renovation_state"), ["raw", "dated", "recent", "premium"], "recent"
             ),
             view_quality=_validate_enum(
-                parsed.get("view_quality"), ["courtyard", "street", "panoramic", "unknown"], "unknown"
+                parsed.get("view_quality"),
+                ["courtyard", "street", "panoramic", "landmark", "unknown"],
+                "unknown",
             ),
             natural_light=_validate_enum(
                 parsed.get("natural_light"), ["dark", "average", "bright"], "average"

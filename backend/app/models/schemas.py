@@ -119,8 +119,16 @@ class MarketIndex(BaseModel):
 
 class PhotoAnalysis(BaseModel):
     renovation_state: Literal["raw", "dated", "recent", "premium"]
-    view_quality: Literal["courtyard", "street", "panoramic", "unknown"]
+    view_quality: Literal["courtyard", "street", "panoramic", "landmark", "unknown"]
     natural_light: Literal["dark", "average", "bright"]
+
+
+class PremiumFeatures(BaseModel):
+    """Vue, luminosité et atouts détectés (texte annonce + photos)."""
+    view_tier: Literal["none", "courtyard", "street", "panoramic", "landmark"] = "none"
+    light_tier: Literal["none", "dark", "average", "bright", "exceptional"] = "none"
+    highlights_fr: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
 
 
 class TransitStop(BaseModel):
@@ -141,6 +149,7 @@ class AnalyzeResponse(BaseModel):
     negotiation: NegotiationScript | None = None
     market_index: MarketIndex | None = None
     photo_analysis: PhotoAnalysis | None = None
+    premium_features: PremiumFeatures | None = None
     delta_pct: float | None = None
     delta_eur: float | None = None
     warnings: list[str] = Field(default_factory=list)
