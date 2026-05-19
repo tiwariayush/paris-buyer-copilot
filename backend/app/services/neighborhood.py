@@ -13,7 +13,9 @@ import httpx
 
 from ..config import settings
 from ..models.schemas import Neighborhood
+from .area_market import yearly_trends, yoy_change_pct
 from .cache import get_cache
+from .commune_stats import fetch_commune
 from .income import get_median_income
 from .transit import nearest_stops
 
@@ -81,30 +83,56 @@ async def enrich(
     iris_code: str | None,
     iris_name: str | None,
     postcode: str | None = None,
+    *,
+    code_commune: str | None = None,
 ) -> Neighborhood:
+    income = get_median_income(postcode)
+
     if lat is None or lon is None:
+        trends, scope, area_label = yearly_trends(
+            lon=None, lat=None, code_postal=postcode
+        )
+        commune = await fetch_commune(code_commune) if code_commune else {}
         return Neighborhood(
             iris_code=iris_code,
             iris_name=iris_name,
-            median_household_income_eur=get_median_income(postcode),
+            median_household_income_eur=income,
+            population=commune.get("population"),
+            commune_name=commune.get("name"),
+            market_trends=trends,
+            market_area_label=area_label,
+            market_scope=scope if trends else None,
+            trend_yoy_pct=yoy_change_pct(trends),
         )
+
     cache = get_cache()
-    cache_key = f"nbh:{round(lat, 5)},{round(lon, 5)}"
+    cache_key = f"nbh:{round(lat, 5)},{round(lon, 5)}:{postcode or ''}"
     cached = await cache.get(cache_key)
     if cached:
         try:
             return Neighborhood(**json.loads(cached))
         except Exception:
             pass
+
     schools = await _schools_near(lat, lon, postcode=postcode)
     transit = nearest_stops(lat, lon)
-    income = get_median_income(postcode)
+    trends, scope, area_label = yearly_trends(
+        lon=lon, lat=lat, code_postal=postcode
+    )
+    commune = await fetch_commune(code_commune) if code_commune else {}
+
     nbh = Neighborhood(
         iris_code=iris_code,
         iris_name=iris_name,
         nearest_schools=schools,
         nearest_transit=transit,
         median_household_income_eur=income,
+        population=commune.get("population"),
+        commune_name=commune.get("name"),
+        market_trends=trends,
+        market_area_label=area_label,
+        market_scope=scope if trends else None,
+        trend_yoy_pct=yoy_change_pct(trends),
     )
     await cache.set(cache_key, nbh.model_dump_json(), ttl=86400)
     return nbh

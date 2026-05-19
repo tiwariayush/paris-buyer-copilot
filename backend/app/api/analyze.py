@@ -367,6 +367,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
                 location.code_iris,
                 location.nom_iris,
                 postcode=listing.postal_code or location.code_postal,
+                code_commune=location.code_commune,
             )
         except Exception as e:
             warnings.append(f"Neighborhood lookup failed: {e}")
@@ -382,7 +383,11 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         warnings.append(f"[{qw.severity}] {qw.message_fr}")
 
     mkt_index = market_index.compute_market_position(
-        listing.price_eur, listing.surface_m2, code_postal
+        listing.price_eur,
+        listing.surface_m2,
+        lon=location.lon if location else None,
+        lat=location.lat if location else None,
+        code_postal=code_postal,
     )
 
     log.info(
@@ -521,6 +526,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
                     location.code_iris,
                     location.nom_iris,
                     postcode=listing.postal_code or location.code_postal,
+                    code_commune=location.code_commune,
                 )
             except Exception as e:
                 warnings.append(f"Neighborhood lookup failed: {e}")
@@ -536,7 +542,11 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             warnings.append(f"[{qw.severity}] {qw.message_fr}")
 
         mkt_index = market_index.compute_market_position(
-            listing.price_eur, listing.surface_m2, code_postal
+            listing.price_eur,
+            listing.surface_m2,
+            lon=location.lon if location else None,
+            lat=location.lat if location else None,
+            code_postal=code_postal,
         )
 
         log.info(

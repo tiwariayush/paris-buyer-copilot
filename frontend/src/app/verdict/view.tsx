@@ -152,6 +152,7 @@ function Results({ data }: { data: AnalyzeResponse }) {
     delta_eur,
     warnings,
     premium_features,
+    market_index,
   } = data;
 
   return (
@@ -198,7 +199,7 @@ function Results({ data }: { data: AnalyzeResponse }) {
             />
           )}
           <DPECard listing={listing} dpe={dpe} />
-          <NeighborhoodCard data={neighborhood} />
+          <NeighborhoodCard data={neighborhood} marketIndex={market_index} />
         </div>
       </div>
 

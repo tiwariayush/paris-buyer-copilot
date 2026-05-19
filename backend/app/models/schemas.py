@@ -89,14 +89,25 @@ class Valuation(BaseModel):
     rationale: str = ""
 
 
+class YearlyMarketTrend(BaseModel):
+    year: int
+    median_price_per_m2: float
+    transaction_count: int
+
+
 class Neighborhood(BaseModel):
     iris_code: str | None = None
     iris_name: str | None = None
     median_household_income_eur: float | None = None
     population: int | None = None
+    commune_name: str | None = None
     nearest_schools: list[dict] = Field(default_factory=list)
     nearest_transit: list[dict] = Field(default_factory=list)
     transit: dict | None = None
+    market_trends: list[YearlyMarketTrend] = Field(default_factory=list)
+    market_area_label: str | None = None
+    market_scope: Literal["radius", "arrondissement"] | None = None
+    trend_yoy_pct: float | None = None
 
 
 class NegotiationLever(BaseModel):
@@ -115,6 +126,9 @@ class NegotiationScript(BaseModel):
 class MarketIndex(BaseModel):
     arrondissement_median_ppm2: float
     listing_vs_median_pct: float
+    scope: Literal["radius", "arrondissement"] = "arrondissement"
+    n_transactions_12m: int = 0
+    data_source: Literal["dvf_live", "static"] = "dvf_live"
 
 
 class PhotoAnalysis(BaseModel):

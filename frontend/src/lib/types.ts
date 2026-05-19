@@ -72,11 +72,18 @@ export interface Valuation {
   rationale: string;
 }
 
+export interface YearlyMarketTrend {
+  year: number;
+  median_price_per_m2: number;
+  transaction_count: number;
+}
+
 export interface Neighborhood {
   iris_code?: string | null;
   iris_name?: string | null;
   median_household_income_eur?: number | null;
   population?: number | null;
+  commune_name?: string | null;
   nearest_schools: Array<{
     name?: string;
     type?: string;
@@ -85,7 +92,25 @@ export interface Neighborhood {
     lat?: number;
     lon?: number;
   }>;
+  nearest_transit?: Array<{
+    name?: string;
+    line?: string;
+    distance_m?: number;
+    walk_minutes?: number;
+  }>;
   transit?: Record<string, unknown> | null;
+  market_trends?: YearlyMarketTrend[];
+  market_area_label?: string | null;
+  market_scope?: "radius" | "arrondissement" | null;
+  trend_yoy_pct?: number | null;
+}
+
+export interface MarketIndex {
+  arrondissement_median_ppm2: number;
+  listing_vs_median_pct: number;
+  scope?: "radius" | "arrondissement";
+  n_transactions_12m?: number;
+  data_source?: "dvf_live" | "static";
 }
 
 export interface NegotiationLever {
@@ -116,6 +141,7 @@ export interface AnalyzeResponse {
   dpe?: DPEReport | null;
   neighborhood?: Neighborhood | null;
   negotiation?: NegotiationScript | null;
+  market_index?: MarketIndex | null;
   premium_features?: PremiumFeatures | null;
   delta_pct?: number | null;
   delta_eur?: number | null;
