@@ -14,6 +14,8 @@ import httpx
 from ..config import settings
 from ..models.schemas import Neighborhood
 from .cache import get_cache
+from .income import get_median_income
+from .transit import nearest_stops
 
 EDU_API = (
     "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/"
@@ -81,7 +83,11 @@ async def enrich(
     postcode: str | None = None,
 ) -> Neighborhood:
     if lat is None or lon is None:
-        return Neighborhood(iris_code=iris_code, iris_name=iris_name)
+        return Neighborhood(
+            iris_code=iris_code,
+            iris_name=iris_name,
+            median_household_income_eur=get_median_income(postcode),
+        )
     cache = get_cache()
     cache_key = f"nbh:{round(lat, 5)},{round(lon, 5)}"
     cached = await cache.get(cache_key)
@@ -91,10 +97,14 @@ async def enrich(
         except Exception:
             pass
     schools = await _schools_near(lat, lon, postcode=postcode)
+    transit = nearest_stops(lat, lon)
+    income = get_median_income(postcode)
     nbh = Neighborhood(
         iris_code=iris_code,
         iris_name=iris_name,
         nearest_schools=schools,
+        nearest_transit=transit,
+        median_household_income_eur=income,
     )
     await cache.set(cache_key, nbh.model_dump_json(), ttl=86400)
     return nbh
