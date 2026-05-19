@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import { Card, CardLabel, CardTitle } from "@/components/Card";
+import { Card, CardTitle } from "@/components/Card";
 import type { PremiumFeatures } from "@/lib/types";
 
 export function PremiumFeaturesCard({
@@ -17,10 +17,10 @@ export function PremiumFeaturesCard({
 
   return (
     <Card>
-      <CardLabel className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-[var(--muted)] font-medium">
         <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />
-        Atouts détectés
-      </CardLabel>
+        <span>Atouts détectés</span>
+      </div>
       <CardTitle className="mt-1 text-base font-medium">
         Vue & luminosité pris en compte
       </CardTitle>
