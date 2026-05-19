@@ -20,6 +20,7 @@ from ..services import (
     listing_parser,
     market_index,
     neighborhood,
+    photo_analysis,
     quality,
     valuation,
 )
@@ -322,14 +323,6 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
     if location and location.id_parcelle:
         building_hist = dvf.building_history(location.id_parcelle)
 
-    val = valuation.value_listing(listing, comps, base_tier)
-
-    delta_eur = None
-    delta_pct = None
-    if listing.price_eur and val.fair_value_eur:
-        delta_eur = listing.price_eur - val.fair_value_eur
-        delta_pct = (delta_eur / val.fair_value_eur) * 100.0
-
     dpe_report = None
     try:
         dpe_report = await dpe.lookup(
@@ -337,12 +330,27 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         )
     except Exception as e:
         warnings.append(f"DPE lookup failed: {e}")
+
+    photo_result = None
+    try:
+        photo_result = await photo_analysis.analyze_photos(listing.photos)
+    except Exception as e:
+        warnings.append(f"Photo analysis failed: {e}")
+
+    renovation_state = photo_result.renovation_state if photo_result else None
+
     if dpe_report and dpe_report.dpe_class and not listing.dpe_class:
         listing.dpe_class = dpe_report.dpe_class
-        val = valuation.value_listing(listing, comps, base_tier)
-        if listing.price_eur and val.fair_value_eur:
-            delta_eur = listing.price_eur - val.fair_value_eur
-            delta_pct = (delta_eur / val.fair_value_eur) * 100.0
+
+    val = valuation.value_listing(
+        listing, comps, base_tier, renovation_state=renovation_state
+    )
+
+    delta_eur = None
+    delta_pct = None
+    if listing.price_eur and val.fair_value_eur:
+        delta_eur = listing.price_eur - val.fair_value_eur
+        delta_pct = (delta_eur / val.fair_value_eur) * 100.0
 
     nbh = None
     if location:
@@ -392,6 +400,7 @@ async def analyze(req: AnalyzeRequest, response: Response) -> AnalyzeResponse:
         neighborhood=nbh,
         negotiation=negotiation,
         market_index=mkt_index,
+        photo_analysis=photo_result,
         delta_pct=delta_pct,
         delta_eur=delta_eur,
         warnings=warnings,
@@ -462,14 +471,6 @@ async def analyze_stream(request: Request) -> StreamingResponse:
         if location and location.id_parcelle:
             building_hist = dvf.building_history(location.id_parcelle)
 
-        val = valuation.value_listing(listing, comps, base_tier)
-
-        delta_eur = None
-        delta_pct = None
-        if listing.price_eur and val.fair_value_eur:
-            delta_eur = listing.price_eur - val.fair_value_eur
-            delta_pct = (delta_eur / val.fair_value_eur) * 100.0
-
         dpe_report = None
         try:
             dpe_report = await dpe.lookup(
@@ -477,12 +478,27 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             )
         except Exception as e:
             warnings.append(f"DPE lookup failed: {e}")
+
+        photo_result = None
+        try:
+            photo_result = await photo_analysis.analyze_photos(listing.photos)
+        except Exception as e:
+            warnings.append(f"Photo analysis failed: {e}")
+
+        renovation_state = photo_result.renovation_state if photo_result else None
+
         if dpe_report and dpe_report.dpe_class and not listing.dpe_class:
             listing.dpe_class = dpe_report.dpe_class
-            val = valuation.value_listing(listing, comps, base_tier)
-            if listing.price_eur and val.fair_value_eur:
-                delta_eur = listing.price_eur - val.fair_value_eur
-                delta_pct = (delta_eur / val.fair_value_eur) * 100.0
+
+        val = valuation.value_listing(
+            listing, comps, base_tier, renovation_state=renovation_state
+        )
+
+        delta_eur = None
+        delta_pct = None
+        if listing.price_eur and val.fair_value_eur:
+            delta_eur = listing.price_eur - val.fair_value_eur
+            delta_pct = (delta_eur / val.fair_value_eur) * 100.0
 
         nbh = None
         if location:
@@ -526,6 +542,7 @@ async def analyze_stream(request: Request) -> StreamingResponse:
             neighborhood=nbh,
             negotiation=negotiation,
             market_index=mkt_index,
+            photo_analysis=photo_result,
             delta_pct=delta_pct,
             delta_eur=delta_eur,
             warnings=warnings,

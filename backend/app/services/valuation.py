@@ -24,6 +24,13 @@ DPE_MULTIPLIERS: dict[str, float] = {
     "G": 0.88,
 }
 
+RENOVATION_MULTIPLIERS: dict[str, float] = {
+    "raw": 0.85,
+    "dated": 0.95,
+    "recent": 1.00,
+    "premium": 1.08,
+}
+
 
 def _recency_weight(d: date, today: date) -> float:
     """Exponential decay: half-life ~24 months."""
@@ -67,6 +74,8 @@ def value_listing(
     listing: Listing,
     comps: list[Comp],
     base_tier: str,
+    *,
+    renovation_state: str | None = None,
 ) -> Valuation:
     target_surface = listing.surface_m2
     if not comps or not target_surface or target_surface <= 0:
@@ -123,6 +132,11 @@ def value_listing(
     if listing.has_elevator and (listing.floor or 0) >= 5:
         adj["top_floor_with_elevator"] = 1.04
         multiplier *= 1.04
+    if renovation_state and renovation_state in RENOVATION_MULTIPLIERS:
+        m = RENOVATION_MULTIPLIERS[renovation_state]
+        if m != 1.0:
+            adj[f"renovation_{renovation_state}"] = m
+            multiplier *= m
 
     adjusted_ppm2 = median_ppm2 * multiplier
     fair_value = adjusted_ppm2 * target_surface
